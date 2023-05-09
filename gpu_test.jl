@@ -315,3 +315,110 @@ grid_size = cld(n, block_size)
 # Copy results back to the CPU
 output_d
 # output = Array(output_d)
+
+
+
+# 2d array example - like particles 
+# function mykernel(A::CuArray{Float32, 2})
+# function mykernel3(A)
+#     i, j = (blockIdx().x - 1) * blockDim().x + threadIdx().x, threadIdx().y
+#     if i <= size(A, 2)
+#         @inbounds A[j, i] += 1
+#     end
+#     return nothing
+# end
+
+# function mykernel3(A)
+#     i = (blockIdx().x - 1) * blockDim().x + threadIdx().x
+#     j = (blockIdx().y - 1)#(blockIdx().x - 1) * blockDim().x + threadIdx().x#blockIdx().y #(blockIdx().y - 1) * blockDim().y + threadIdx().y
+
+#     @inbounds A[j, i] = i
+#     # if i <= size(A, 2)
+#     #     # if j <= size(A, 1)
+#     #     @inbounds A[j, i] = i
+#     #     # end
+#     # end
+    
+#     return nothing
+# end
+function mykernel3(A)
+    index = (blockIdx().x - 1) * blockDim().x + threadIdx().x
+    stride = gridDim().x * blockDim().x
+    for i = index:stride:length(A)
+        @inbounds A[1, i] = i
+        @inbounds A[2, i] = i
+    end
+
+    # i, j = (blockIdx().x - 1) * blockDim().x + threadIdx().x, (blockIdx().y - 1) * blockDim().y + threadIdx().y
+
+    # if i <= size(A, 1)
+    #     A[i] = i
+
+    # end
+    # # if i <= size(A, 1) && j <= size(A, 2)
+    # #     A[j] = j#1#3*i + 6*j
+    # # end
+    return nothing
+end
+
+function bench_gpu_kernel!(A)
+    kernel = @cuda launch=false mykernel3(A)
+    config = launch_configuration(kernel.fun)
+    threads = min(length(A), config.threads)
+    blocks = cld(length(A), threads)
+
+    display(threads)
+    display(blocks)
+
+    CUDA.@sync begin
+        kernel(A; threads, blocks)
+    end
+end
+
+
+A = CUDA.rand(Float32, 5, 1000)
+A[1,1]
+
+bench_gpu_kernel!(A)
+A
+A[1]
+
+A[2,1]
+A[3,1]
+A[10,1]
+A[1,10]
+A[3001]
+A[1001]
+A[2001]
+A[1000]
+
+
+
+# using CuArrays, CUDAnative
+
+function add_offsets_kernel2(A)
+    idx = linear_index(A)
+    # for i in idx
+    #     r, c = indices(A, i)
+    #     A[i] += 5*r + 10*c
+    # end
+    return nothing
+end
+
+function bench_gpu_kernel!(A)
+    kernel = @cuda launch=false add_offsets_kernel2(A)
+    config = launch_configuration(kernel.fun)
+    threads = min(length(A), config.threads)
+    blocks = cld(length(A), threads)
+
+    display(threads)
+    display(blocks)
+
+    CUDA.@sync begin
+        kernel(A; threads, blocks)
+    end
+end
+
+A = CUDA.rand(Float32, 5, 1000)
+bench_gpu_kernel!(A)
+A
