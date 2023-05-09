@@ -422,3 +422,104 @@ end
 A = CUDA.rand(Float32, 5, 1000)
 bench_gpu_kernel!(A)
 A
+
+
+
+using CUDA
+
+# Assume an image of size (height, width) is stored globally in a CuArray
+const IMAGE = CuArray(rand(Float32, 512, 512))
+
+function nearest_pixel_kernel(out, coords)
+    idx = (blockIdx().x - 1) * blockDim().x + threadIdx().x
+    if idx <= length(coords)
+        x, y = coords[idx]
+        # Round to nearest integer to get the pixel indices
+        ix, iy = round(Int, x), round(Int, y)
+        # Clamp pixel indices to image bounds
+        ix = max(min(ix, size(IMAGE, 2)), 1)
+        iy = max(min(iy, size(IMAGE, 1)), 1)
+        # Compute the index of the nearest pixel in the flattened image array
+        pixel_idx = (iy - 1) * size(IMAGE, 2) + ix
+        out[idx] = IMAGE[pixel_idx]
+    end
+    return nothing
+end
+
+# Example usage:
+coords = rand(Float32, 100, 2) #.* (512, 512)
+out = similar(coords, length(coords))
+@cuda nearest_pixel_kernel(out, coords)
+
+
+
+
+using CUDA
+
+# define global variable
+const C = [1 2; 3 4]
+
+# kernel function that accesses global variable
+function mykernel(out)
+    i = (blockIdx().x - 1) * blockDim().x + threadIdx().x
+    if i <= length(out)
+        out[i] = C[i] + 1
+    end
+    return nothing
+end
+
+# create output array
+out = CUDA.zeros(Int, 4)
+
+# launch kernel
+kernel = @cuda launch=false mykernel(out)
+config = launch_configuration(kernel.fun)
+threads = min(length(out), config.threads)
+blocks = cld(length(out), threads)
+
+CUDA.@sync begin
+    kernel(out; threads, blocks)
+end
+
+# print output array
+println(out)
+
+
+
+using CUDA
+
+
+const my_global = CuArray{Float32}(reshape(1:9, 3, 3))
+
+const d = 5
+
+# function mykernel(a::CuArray{Float32, 2}, b::CuArray{Float32, 2})
+function mykernel2(a)
+    # get the index of the thread in the grid
+    # i, j = (blockIdx().x-1)*blockDim().x + threadIdx().x, (blockIdx().y-1)*blockDim().y + threadIdx().y
+
+    # access global variable
+    # global my_global
+
+    # my_global[1,1]
+    a[1] += d[1]
+
+    # perform computation
+    # b[i, j] = a[i, j] + my_global[i, j]
+    return nothing
+end
+
+a = CuArray{Float32}(rand(Float32, 100))
+
+# b = CuArray{Float32}(rand(Float32, 100, 2))
+
+# launch kernel
+kernel = @cuda launch=false mykernel2(a)
+config = launch_configuration(kernel.fun)
+threads = min(length(a), config.threads)
+blocks = cld(length(a), threads)
+
+CUDA.@sync begin
+    kernel(a; threads, blocks)
+end
+a
