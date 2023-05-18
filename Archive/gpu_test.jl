@@ -523,3 +523,16 @@ CUDA.@sync begin
     kernel(a; threads, blocks)
 end
 a
+
+
+
+using CUDA
+
+# create a sample CuArray on the device
+cuarr = CUDA.fill(1.0, (3, 3))
+
+# convert the CuArray to a matrix
+mat = Array(cuarr)
+
+# print the resulting matrix
+println(mat)
